@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use crate::digit::Digit;
 use std::fmt::Formatter;
-use std::ops::BitOr;
+use std::ops::{BitOr, BitXor};
 use std::{cmp, fmt, ops};
 
 pub const NUM_BITS: usize = 9;
@@ -65,6 +65,12 @@ impl TryFrom<u64> for Variants {
     }
 }
 
+impl From<Variants> for u64 {
+    fn from(v: Variants) -> Self {
+        v.0 as u64
+    }
+}
+
 impl ops::BitOr<Variants> for Variants {
     type Output = Variants;
 
@@ -83,7 +89,35 @@ impl ops::BitOr<Digit> for Variants {
 
 impl ops::BitOrAssign<Digit> for Variants {
     fn bitor_assign(&mut self, rhs: Digit) {
-        *self = self.bitor(rhs)
+        *self = *self | rhs
+    }
+}
+
+impl ops::BitXor<Variants> for Variants {
+    type Output = Variants;
+
+    fn bitxor(self, rhs: Variants) -> Self::Output {
+        Variants(self.0 ^ rhs.0)
+    }
+}
+
+impl ops::BitXorAssign<Variants> for Variants {
+    fn bitxor_assign(&mut self, rhs: Variants) {
+        *self = *self ^ rhs
+    }
+}
+
+impl ops::BitXor<Digit> for Variants {
+    type Output = Variants;
+
+    fn bitxor(self, rhs: Digit) -> Self::Output {
+        self.bitxor(Variants::from(rhs))
+    }
+}
+
+impl ops::BitXorAssign<Digit> for Variants {
+    fn bitxor_assign(&mut self, rhs: Digit) {
+        *self = *self ^ rhs
     }
 }
 

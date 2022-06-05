@@ -3,8 +3,9 @@ use crate::grid::{BlockPoint, GridBlock, GridColumn, GridPoint, GridRow, HEIGHT,
 use crate::variants::{Variants, NUM_BITS};
 use crate::{grid, variants};
 use std::vec::IntoIter;
-use std::{mem, ops, usize};
-use std::convert::TryInto;
+use std::{fmt, mem, ops, usize};
+use std::convert::{TryInto, TryFrom};
+use std::fmt::{Formatter, write};
 
 type Ty = u64; // Bitmap uses Ty to store bits
 
@@ -12,10 +13,16 @@ const GRID_SIZE_BITS: usize = NUM_BITS * grid::WIDTH * grid::HEIGHT;
 const MASK: Ty = variants::MASK as Ty;
 
 const GRID_SIZE_TY: usize =
-    GRID_SIZE_BITS / mem::size_of::<Ty>() + ((GRID_SIZE_BITS % mem::size_of::<Ty>() > 0) as usize);
+    GRID_SIZE_BITS / (8*mem::size_of::<Ty>()) + ((GRID_SIZE_BITS % (8*mem::size_of::<Ty>()) > 0) as usize);
 
 pub struct Bitmap {
     data: [Ty; GRID_SIZE_TY],
+}
+
+impl fmt::Debug for Bitmap {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.data, f)
+    }
 }
 
 impl Bitmap {
@@ -25,28 +32,31 @@ impl Bitmap {
         }
     }
 
-    fn set_bit(&mut self, idx: Index) {
+    fn clear_bit(&mut self, idx: Index) {
         self.data[idx.i()] &= !(1 << idx.j());
     }
 
-    fn clear_bit(&mut self, idx: Index) {
+    fn set_bit(&mut self, idx: Index) {
         self.data[idx.i()] |= 1 << idx.j();
     }
 
-    pub fn set_digit(&mut self, p: GridPoint, digit: Digit) {
+    pub fn set_variants(&mut self, p: GridPoint, variants: Variants) {
         let ops::Range { start, end } = IndexRange::new(p).0;
 
         let other_bits = self.data[start.i()] & !(MASK << start.j());
-        let digit_bits = 0x1 << (Ty::from(digit) + start.j() as Ty);
+        let digit_bits = Ty::from(variants) << start.j();
         self.data[start.i()] = other_bits | digit_bits;
 
         if end.i() <= start.i() {
             return;
         }
         let other_bits = self.data[end.i()] & !(MASK >> (NUM_BITS - end.j()));
-        let shift = i32::from(digit) - (NUM_BITS - end.j()) as i32;
-        let digit_bits = if shift >= 0 { 0x1 << shift } else { 0 };
+        let digit_bits = Ty::from(variants) >> (NUM_BITS - end.j());
         self.data[end.i()] = other_bits | digit_bits;
+    }
+
+    pub fn set_digit(&mut self, p: GridPoint, digit: Digit) {
+        self.set_variants(p, digit.into())
     }
 
     pub fn get_variants(&self, p: GridPoint) -> Variants {
@@ -102,15 +112,21 @@ impl Bitmap {
 
 pub struct Index(usize);
 
+impl fmt::Debug for Index {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "(idx={},i={},j={})", self.0, self.i(), self.j())
+    }
+}
+
 impl Index {
     fn new(p: GridPoint, d: Digit) -> Index {
         Index((p.y.0 * grid::WIDTH + p.x.0) * NUM_BITS + usize::from(d))
     }
     pub fn i(&self) -> usize {
-        self.0 / mem::size_of::<Ty>()
+        self.0 / (8*mem::size_of::<Ty>())
     }
     pub fn j(&self) -> usize {
-        self.0 % mem::size_of::<Ty>()
+        self.0 % (8*mem::size_of::<Ty>())
     }
 }
 
@@ -184,11 +200,11 @@ impl Iterator for BitmapRowIterator<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::bitmap::Bitmap;
+    use crate::bitmap::{Bitmap, Index};
     use crate::digit::Digit;
-    use crate::grid::GridRow;
+    use crate::grid::{GridColumn, GridPoint, GridRow};
     use crate::solution::{for_each_point, for_each_point_mut, pretty, Solution};
-    use crate::{digit, variants};
+    use crate::{digit, grid, variants};
     use std::env::var;
     use std::fs;
     use std::fs::File;
@@ -218,16 +234,53 @@ mod tests {
     }
 
     #[test]
-    fn test_clear_column() {
-        let bitmap = Bitmap::new();
+    fn test_row_iterator() {
+        let mut bitmap = Bitmap::new();
         for row in bitmap.iter() {
             for vars in row.iter() {
                 assert_eq!(vars, variants::ANY);
             }
         }
-
-        // bitmap.clear_row(GridRow(0), digit::FIVE);
-
-        // assert_eq!();
     }
+
+    #[test]
+    fn test_clear_row() {
+        let mut bitmap = Bitmap::new();
+        let target_row = GridRow(1);
+        let target_digit = digit::FIVE;
+
+        bitmap.clear_row(target_row, target_digit);
+
+        for (y, row) in bitmap.iter().enumerate() {
+            let expected = if GridRow(y) == target_row {
+                variants::ANY ^ target_digit
+            } else {
+                variants::ANY
+            };
+            for (x, vars) in row.iter().enumerate() {
+                assert_eq!(expected, vars, "y: {}, x: {}", y, x);
+            }
+        }
+    }
+
+    #[test]
+    fn test_clear_column() {
+        let mut bitmap = Bitmap::new();
+        let target_row = GridColumn(3);
+        let target_digit = digit::EIGHT;
+
+        bitmap.clear_column(target_row, target_digit);
+
+        for (y, row) in bitmap.iter().enumerate() {
+            for (x, vars) in row.iter().enumerate() {
+                let expected = if GridColumn(x) == target_row {
+                    variants::ANY ^ target_digit
+                } else {
+                    variants::ANY
+                };
+                assert_eq!(expected, vars, "y: {}, x: {}", y, x);
+            }
+        }
+    }
+
 }

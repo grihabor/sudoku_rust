@@ -1,6 +1,6 @@
 use crate::range::{Range, SameAs};
 use std::ops::Add;
-use std::{mem, ops};
+use std::{cmp, mem, ops};
 
 pub const WIDTH: usize = 9;
 pub const HEIGHT: usize = 9;
@@ -27,6 +27,12 @@ pub const BLOCK_ROWS: Range<BlockRow> = Range {
 
 #[derive(Copy, Clone)]
 pub struct GridColumn(pub usize);
+
+impl cmp::PartialEq for GridColumn {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
 
 impl ops::Add<i32> for GridColumn {
     type Output = GridColumn;
@@ -58,6 +64,12 @@ impl SameAs<usize> for GridColumn {}
 
 #[derive(Copy, Clone)]
 pub struct GridRow(pub usize);
+
+impl cmp::PartialEq for GridRow {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
 
 impl ops::Add<usize> for GridRow {
     type Output = GridRow;
