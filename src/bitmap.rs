@@ -32,6 +32,14 @@ impl Bitmap {
         }
     }
 
+    pub fn all_variants_contain_single_digit(&self) -> bool {
+        return self.count_ones() == 9*9
+    }
+
+    pub fn count_ones(&self) -> u32 {
+        self.data.iter().map(|cell| cell.count_ones()).sum()
+    }
+
     fn clear_bit(&mut self, idx: Index) {
         self.data[idx.i()] &= !(1 << idx.j());
     }

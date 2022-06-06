@@ -22,6 +22,10 @@ impl Solution {
                 bitmap.set_known_digit(point, digit)
             }
         });
+
+        while !bitmap.all_variants_contain_single_digit() {
+
+        }
         for_each_point_mut(board, |point, ch| {
             *ch = match bitmap.get_digit(point) {
                 Ok(d) => d.into(),
